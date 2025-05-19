@@ -24,32 +24,36 @@ A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss l
 | `/leaderboard`    | Displays player standings leaderboard  |
 | `/undo`           | Reopens or remakes a match thread      |
 
-
 ## 🛠️ Setup
 
 1. Clone the repo and install dependencies:
-```bash
-git clone https://github.com/yourusername/1v1-draft-bot.git
-cd 1v1-draft-bot
-pip install -r requirements.txt
+    ```bash
+    git clone https://github.com/yourusername/1v1-draft-bot.git
+    cd 1v1-draft-bot
+    pip install -r requirements.txt
+    ```
 
-Edit draft.py:
+2. Edit `draft.py`:
+    - Set your bot token at the bottom:
+        ```python
+        bot.run("YOUR_BOT_TOKEN")
+        ```
+    - Set your results channel:
+        ```python
+        RESULTS_CHANNEL_ID = 123456789012345678
+        ```
 
-Set your bot token at the bottom:
+3. Run the bot:
+    ```bash
+    python draft.py
+    ```
 
-python
-Copy
-Edit
-bot.run("YOUR_BOT_TOKEN")
-Set your results channel:
+## 🧠 Notes
 
-python
-Copy
-Edit
-RESULTS_CHANNEL_ID = 123456789012345678
-Run the bot:
+- Uses `discord.py 2.x` with `discord.ui` views and slash command support
+- All match data and player stats are stored in `player_stats.json`
+- Temporary match state (buttons, confirmations) is stored in memory
 
-bash
-Copy
-Edit
-python draft.py
+## 📝 License
+
+MIT License. Free to use, modify, and share.
