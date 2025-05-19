@@ -45,7 +45,7 @@ A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss l
 
 3. Run the bot:
     ```bash
-    python draft.py
+   start.bat
     ```
 
 ## 🧠 Notes
