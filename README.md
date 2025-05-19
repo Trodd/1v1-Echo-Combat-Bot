@@ -32,7 +32,7 @@ A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss l
 
 1. Clone the repo and install dependencies:
     ```bash
-    git clone https://github.com/yourusername/1v1-draft-bot.git
+    git clone https://github.com/Trodd/1v1-draft-bot.git
     cd 1v1-draft-bot
     pip install -r requirements.txt
     ```
