@@ -12,7 +12,6 @@ A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss l
 - ✅ Both players must confirm match results
 - 🏆 Leaderboard with W/L/GP (games played), sorted by wins
 - 🔒 Close thread button (auto-deletes thread after a delay)
-- 🔁 `!undo @user1 @user2` to reopen or recreate deleted threads
 - 📤 Results posted as embeds to a public match results channel
 
 ## 💬 Commands
