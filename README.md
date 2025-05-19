@@ -1,6 +1,7 @@
 # 🏆 1v1-Echo-Combat-Bot
 
 A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss leaderboards — perfect for leagues, tournaments, or competitive communities.
+It technically can be used for any type of 1v1 best of 3 type of round-robin mode, but was mainly built for Echo Combat.
 
 ## 🔧 Features
 
