@@ -24,6 +24,11 @@ A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss l
 | `/leaderboard`    | Displays player standings leaderboard  |
 | `/undo`           | Reopens or remakes a match thread      |
 
+## 📦 Requirements
+
+- Python 3.9 or higher (https://www.python.org/downloads/)
+- discord.py >= 2.3.2 (installed via pip)
+
 ## 🛠️ Setup
 
 1. Clone the repo and install dependencies:
