@@ -12,7 +12,7 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-RESULTS_CHANNEL_ID = 1373873199393280102                # replace with your actual channel ID
+RESULTS_CHANNEL_ID = 1374266417364336641               # replace with your actual channel ID
 
 
 # === Persistent Stat Storage ===
@@ -98,22 +98,22 @@ class MatchView(discord.ui.View):
         await self.update_score_message(interaction.channel)
         await interaction.response.send_message("Recorded.", ephemeral=True)
 
-    @discord.ui.button(label="Map 1", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="Map 1", style=discord.ButtonStyle.green, custom_id="match_map1")
     async def map1(self, i, b):
         b.label = f"Map 1 - {i.user.display_name} Wins"
         await self.handle_click(i, 1, i.user)
 
-    @discord.ui.button(label="Map 2", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="Map 2", style=discord.ButtonStyle.blurple, custom_id="match_map2")
     async def map2(self, i, b):
         b.label = f"Map 2 - {i.user.display_name} Wins"
         await self.handle_click(i, 2, i.user)
 
-    @discord.ui.button(label="Map 3", style=discord.ButtonStyle.gray)
+    @discord.ui.button(label="Map 3", style=discord.ButtonStyle.gray, custom_id="match_map3")
     async def map3(self, i, b):
         b.label = f"Map 3 - {i.user.display_name} Wins"
         await self.handle_click(i, 3, i.user)
 
-    @discord.ui.button(label="✅ Confirm Result", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ Confirm Result", style=discord.ButtonStyle.success, custom_id="match_confirm")
     async def confirm(self, interaction, button):
         data = match_results[self.thread_id]
         data["confirmed"].add(interaction.user.id)
@@ -145,12 +145,32 @@ class MatchView(discord.ui.View):
         else:
             await interaction.response.send_message("Waiting for both confirmations.", ephemeral=True)
 
+class PersistentMatchView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Map 1", style=discord.ButtonStyle.green, custom_id="match_map1")
+    async def map1(self, interaction, button):
+        await interaction.response.send_message("⛔ This match view is inactive (bot restarted).", ephemeral=True)
+
+    @discord.ui.button(label="Map 2", style=discord.ButtonStyle.blurple, custom_id="match_map2")
+    async def map2(self, interaction, button):
+        await interaction.response.send_message("⛔ This match view is inactive (bot restarted).", ephemeral=True)
+
+    @discord.ui.button(label="Map 3", style=discord.ButtonStyle.gray, custom_id="match_map3")
+    async def map3(self, interaction, button):
+        await interaction.response.send_message("⛔ This match view is inactive (bot restarted).", ephemeral=True)
+
+    @discord.ui.button(label="✅ Confirm Result", style=discord.ButtonStyle.success, custom_id="match_confirm")
+    async def confirm(self, interaction, button):
+        await interaction.response.send_message("⛔ This match view is inactive (bot restarted).", ephemeral=True)
+
 class CloseThreadView(discord.ui.View):
     def __init__(self, p1_id, p2_id, admin_id):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
         self.allowed_ids = {p1_id, p2_id, admin_id}
 
-    @discord.ui.button(label="🔒 Close Thread", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="🔒 Close Thread", style=discord.ButtonStyle.danger, custom_id="close_thread")
     async def close_thread(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id not in self.allowed_ids:
             return await interaction.response.send_message("You're not allowed to close this thread.", ephemeral=True)
@@ -170,7 +190,7 @@ class CloseThreadView(discord.ui.View):
 # === Signup View ===
 class SignupView(discord.ui.View):
     def __init__(self, admin_id, event_time):
-        super().__init__(timeout=300)
+        super().__init__(timeout=None)
         self.players = []
         self.admin_id = admin_id
         self.event_time = event_time
@@ -186,7 +206,7 @@ class SignupView(discord.ui.View):
         )
         await self.embed_msg.edit(embed=embed, view=self)
 
-    @discord.ui.button(label="✅ Sign Up", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="✅ Sign Up", style=discord.ButtonStyle.green, custom_id="signup")
     async def signup(self, interaction: discord.Interaction, button):
         if interaction.user in self.players:
             return await interaction.response.send_message("You're already signed up.", ephemeral=True)
@@ -194,7 +214,7 @@ class SignupView(discord.ui.View):
         await self.update_embed()
         await interaction.response.send_message("Signed up!", ephemeral=True)
 
-    @discord.ui.button(label="❌ Unsign", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="❌ Unsign", style=discord.ButtonStyle.red, custom_id="unsign")
     async def unsign(self, interaction: discord.Interaction, button):
         if interaction.user not in self.players:
             return await interaction.response.send_message("You weren't signed up.", ephemeral=True)
@@ -202,13 +222,15 @@ class SignupView(discord.ui.View):
         await self.update_embed()
         await interaction.response.send_message("You have been removed from signups.", ephemeral=True)
 
-    @discord.ui.button(label="🎮 Create Matchups", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="🎮 Create Matchups", style=discord.ButtonStyle.blurple, custom_id="create_match")
     async def create_matchups(self, interaction: discord.Interaction, button):
         if interaction.user.id != self.admin_id:
             return await interaction.response.send_message("Only the host can create matches.", ephemeral=True)
 
         if len(self.players) < 2:
             return await interaction.response.send_message("Not enough players.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         combos = list(itertools.combinations(self.players, 2))
         for p1, p2 in combos:
@@ -237,7 +259,7 @@ class SignupView(discord.ui.View):
                 view=view
             )
 
-        await interaction.response.send_message("✅ Round robin matches created.", ephemeral=True)
+        await interaction.followup.send("✅ Round robin matches created.", ephemeral=True)
 
 # === Commands ===
 @bot.tree.command(name="start_draft", description="Start a 1v1 draft")
@@ -343,9 +365,10 @@ async def undo(interaction: discord.Interaction, user1: discord.User, user2: dis
 async def on_ready():
     load_stats()
     await bot.tree.sync()
+    bot.add_view(PersistentMatchView())
     print(f"✅ Logged in as {bot.user}")
 
-bot.run("BOT_TOKEN_HERE")                  # put bot token here
+bot.run("BOT_TOKEN_HERE")
 
 
 
