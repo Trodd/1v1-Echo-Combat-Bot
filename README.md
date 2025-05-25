@@ -21,7 +21,6 @@ It technically can be used for any type of 1v1 best of 3 type of round-robin mod
 | Command           | Description                            |
 |------------------|----------------------------------------|
 | `/start_draft`    | Starts a draft with UNIX timestamp     |
-| `/leaderboard`    | Displays player standings leaderboard  |
 | `/undo`           | Reopens or remakes a match thread      |
 
 ## 📦 Requirements
