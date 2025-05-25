@@ -13,6 +13,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 RESULTS_CHANNEL_ID = 1374266417364336641               # replace with your actual channel ID
+LEADERBOARD_CHANNEL_ID = 1374268467079024671
 
 
 # === Persistent Stat Storage ===
@@ -280,21 +281,34 @@ async def start_draft(interaction: discord.Interaction, start_time: str):
     view.embed_msg = msg
     await interaction.response.send_message("Draft started!", ephemeral=True)
 
-@bot.tree.command(name="leaderboard", description="View top players")
-async def leaderboard(interaction: discord.Interaction):
+async def update_leaderboard_message():
     if not player_stats:
-        return await interaction.response.send_message("No matches recorded yet.", ephemeral=True)
+        return
+
+    channel = bot.get_channel(LEADERBOARD_CHANNEL_ID)
+    if not channel:
+        print("⚠️ Leaderboard channel not found.")
+        return
+
+    # Try to load existing message ID from file
+    msg_id_file = "leaderboard_message_id.txt"
+    message = None
+
+    if os.path.exists(msg_id_file):
+        try:
+            with open(msg_id_file, "r") as f:
+                message_id = int(f.read().strip())
+                message = await channel.fetch_message(message_id)
+        except:
+            pass  # fallback to sending new message
 
     sorted_stats = sorted(player_stats.items(), key=lambda x: x[1]["wins"], reverse=True)
-
-    header = "#  | Player               |  W |  L | GP"
-    divider = "-" * len(header)
-    rows = []
+    embed = discord.Embed(title="🏆 1v1 Leaderboard", color=discord.Color.gold())
 
     for idx, (uid, stats) in enumerate(sorted_stats[:15], start=1):
         try:
-            user = await bot.fetch_user(int(uid))  # Fetch actual username
-            name = user.display_name[:20]  # Truncate if too long
+            user = await bot.fetch_user(int(uid))
+            name = user.display_name
         except:
             name = f"User-{uid[:5]}"
 
@@ -302,14 +316,15 @@ async def leaderboard(interaction: discord.Interaction):
         losses = stats["losses"]
         games = stats["games"]
 
-        row = f"{str(idx).ljust(2)} | {name.ljust(20)} | {str(wins).rjust(2)} | {str(losses).rjust(2)} | {str(games).rjust(2)}"
-        rows.append(row)
+        value = f"🏅 **Wins:** {wins}  ❌ **Losses:** {losses}  🎮 **Games:** {games}"
+        embed.add_field(name=f"**{idx}. {name}**", value=value, inline=False)
 
-    full_text = f"{header}\n{divider}\n" + "\n".join(rows)
-    embed = discord.Embed(title="🏆 1v1 Leaderboard", color=discord.Color.gold())
-    embed.description = f"```{full_text}```"
-
-    await interaction.response.send_message(embed=embed)
+    if message:
+        await message.edit(embed=embed)
+    else:
+        message = await channel.send(embed=embed)
+        with open(msg_id_file, "w") as f:
+            f.write(str(message.id))
 
 @bot.tree.command(name="undo", description="Undo a match by player pair")
 @app_commands.describe(user1="First player", user2="Second player")
@@ -366,6 +381,7 @@ async def on_ready():
     load_stats()
     await bot.tree.sync()
     bot.add_view(PersistentMatchView())
+    await update_leaderboard_message()
     print(f"✅ Logged in as {bot.user}")
 
 bot.run("BOT_TOKEN_HERE")
