@@ -83,7 +83,4 @@ signups.json stores active signup sessions
 
 📝 License
 MIT License — free to use, modify, and distribute.
-Works across bot restarts without losing match state
 
-📝 License
-MIT License — free to use, modify, and distribute.
