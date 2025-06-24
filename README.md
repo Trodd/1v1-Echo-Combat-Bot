@@ -50,11 +50,19 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 ```bash
 git clone https://github.com/Trodd/1v1-draft-bot.git
 cd 1v1-draft-bot
-2. Install dependencies:
-pip install -r requirements.txt
-3. Open draft.py and fill in the required configuration:
-✅ Fill in these at the top:
+```
 
+### 2. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Open `draft.py` and fill in the required configuration:
+
+#### ✅ Fill in these at the top:
+
+```python
 # -----------FILL IN IDs HERE SO BOT CAN WORK------------------------
 
 RESULTS_CHANNEL_ID = 1374266417364336641       # Channel to post match results
@@ -62,25 +70,38 @@ LEADERBOARD_CHANNEL_ID = 1374268467079024671   # Channel to post the leaderboard
 REQUIRED_ROLE_ID = 1387186995146658013         # Role required to use /1v1 and /undo
 
 #--------------------------------------------------------------------
-🔐 Then scroll to the bottom and insert your bot token:
+```
 
+#### 🔐 Then scroll to the bottom and insert your bot token:
+
+```python
 bot.run("YOUR_BOT_TOKEN")
-Replace "YOUR_BOT_TOKEN" with your actual Discord bot token from the Developer Portal.
+```
 
-4. Run the bot:
+Replace `"YOUR_BOT_TOKEN"` with your actual Discord bot token from the Developer Portal.
 
+---
+
+### 4. Run the bot:
+
+```bash
 start.bat
-🧠 Technical Notes
-Uses discord.ui.View for persistent buttons
+```
 
-Match state, score confirmations, and signups are rehydrated from disk on bot restart
+---
 
-player_stats.json stores win/loss/game counts
+## 🧠 Technical Notes
 
-rehydrate.json stores active match state
+- Uses `discord.ui.View` for persistent buttons  
+- Match state, score confirmations, and signups are rehydrated from disk on bot restart  
+- `player_stats.json` stores win/loss/game counts  
+- `rehydrate.json` stores active match state  
+- `signups.json` stores active signup sessions  
 
-signups.json stores active signup sessions
+---
 
-📝 License
+## 📝 License
+
 MIT License — free to use, modify, and distribute.
+
 
