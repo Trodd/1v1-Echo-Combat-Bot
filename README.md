@@ -1,63 +1,103 @@
-# 🏆 1v1-Echo-Combat-Bot
+🏆 1v1-Echo-Combat-Bot
+A powerful Discord bot for managing 1v1 round-robin tournaments, complete with draft signups, auto-threaded matchups, in-thread score reporting, result confirmation, and a live leaderboard. While originally built for Echo Combat, it supports any 1v1 best-of-3 game format.
 
-A Discord bot for managing 1v1 round-robin drafts, match threads, and win/loss leaderboards — perfect for leagues, tournaments, or competitive communities.
-It technically can be used for any type of 1v1 best of 3 type of round-robin mode, but was mainly built for Echo Combat.
+🔧 Features
+✅ Slash command to start 1v1 draft signups with a timestamp and interactive signup buttons
 
-## 🔧 Features
+✅ Players can sign up and remove themselves easily with buttons
 
-- ✅ Slash command to start draft signups with embedded time and player list
-- ✅ Players sign up with buttons (and can unsign)
-- 🎮 Auto-generates round robin 1v1 matchups
-- 🧵 Creates private threads for each match (visible only to players and admin)
-- 🗳️ Map 1–3 score reporting buttons
-- ✅ Both players must confirm match results
-- 🏆 Leaderboard with W/L/GP (games played), sorted by wins
-- 🔒 Close thread button (auto-deletes thread after a delay)
-- 📤 Results posted as embeds to a public match results channel
+🎮 Automatically creates round-robin matchups between all signed-up players
 
-## 💬 Commands
+🧵 Generates private match threads only visible to the two players and the host
 
-### Slash Commands
-| Command           | Description                            |
-|------------------|----------------------------------------|
-| `/start_draft`    | Starts a draft with UNIX timestamp     |
-| `/undo`           | Reopens or remakes a match thread      |
+🗳️ Score reporting buttons for Map 1, 2, and 3
 
-## 📦 Requirements
+✅ Both players must confirm the results — confirms reset if scores change
 
-- Python 3.9 or higher (https://www.python.org/downloads/)
-- discord.py >= 2.3.2 (installed via pip)
+🧠 Score confirmation UI displays who has confirmed so far
 
-## 🛠️ Setup
+🧼 Fully supports undo/reset:
 
-1. Clone the repo and install dependencies:
-    ```bash
-    git clone https://github.com/Trodd/1v1-draft-bot.git
-    cd 1v1-draft-bot
-    pip install -r requirements.txt
-    ```
+Reopen match in same thread if possible
 
-2. Edit `draft.py`:
-    - Set your bot token at the bottom:
-        ```python
-        bot.run("YOUR_BOT_TOKEN")
-        ```
-    - Set your results channel:
-        ```python
-        RESULTS_CHANNEL_ID = 123456789012345678
-        ```
+Deletes old score/results embeds
 
-3. Run the bot:
-    ```bash
-   start.bat
-    ```
+Automatically reverts player stats if the match was finalized
 
-## 🧠 Notes
+🏆 Leaderboard with Wins / Losses / Games Played, updated live after each match
 
-- Uses `discord.py 2.x` with `discord.ui` views and slash command support
-- All match data and player stats are stored in `player_stats.json`
-- Temporary match state (buttons, confirmations) is stored in memory
+🔒 Button to close and delete threads once finished
 
-## 📝 License
+📤 Finalized match results are posted to a public results channel as embeds
 
-MIT License. Free to use, modify, and share.
+♻️ Rehydrates all active matches and signups after a bot restart — including their buttons and state
+
+📌 Handles thread cap limits by auto-creating overflow channels
+
+🛡️ Commands are role-gated to ensure only authorized users can run /1v1 and /undo
+
+💬 Slash Commands
+Command	Description
+/1v1	Starts a draft using a UNIX timestamp
+/undo	Reopens or resets a match between two users
+
+📦 Requirements
+Python 3.9 or higher
+
+discord.py ≥ 2.3.2
+
+Create a Discord bot and add it to your server
+
+🛠️ Setup
+Clone the repo:
+
+bash
+Copy
+Edit
+git clone https://github.com/Trodd/1v1-draft-bot.git
+cd 1v1-draft-bot
+Install dependencies:
+
+bash
+Copy
+Edit
+pip install -r requirements.txt
+Configure your draft.py:
+
+Replace the token:
+
+python
+Copy
+Edit
+bot.run("YOUR_BOT_TOKEN")
+Set your channel IDs:
+
+python
+Copy
+Edit
+RESULTS_CHANNEL_ID = 123456789012345678
+LEADERBOARD_CHANNEL_ID = 123456789012345679
+REQUIRED_ROLE_ID = 123456789012345680  # (Role required to use /1v1 or /undo)
+Start the bot:
+
+bash
+Copy
+Edit
+start.bat
+🧠 Technical Notes
+Uses discord.ui.View for persistent buttons
+
+Supports full rehydration via:
+
+rehydrate.json (active matches & confirmations)
+
+signups.json (active signup embeds)
+
+All win/loss data is stored in player_stats.json
+
+Slash commands registered automatically on startup
+
+Works across bot restarts without losing match state
+
+📝 License
+MIT License — free to use, modify, and distribute.
