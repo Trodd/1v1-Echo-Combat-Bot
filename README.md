@@ -51,15 +51,10 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 git clone https://github.com/Trodd/1v1-draft-bot.git
 cd 1v1-draft-bot
 2. Install dependencies:
-bash
-Copy
-Edit
 pip install -r requirements.txt
 3. Open draft.py and fill in the required configuration:
 ✅ Fill in these at the top:
-python
-Copy
-Edit
+
 # -----------FILL IN IDs HERE SO BOT CAN WORK------------------------
 
 RESULTS_CHANNEL_ID = 1374266417364336641       # Channel to post match results
@@ -68,16 +63,12 @@ REQUIRED_ROLE_ID = 1387186995146658013         # Role required to use /1v1 and /
 
 #--------------------------------------------------------------------
 🔐 Then scroll to the bottom and insert your bot token:
-python
-Copy
-Edit
+
 bot.run("YOUR_BOT_TOKEN")
 Replace "YOUR_BOT_TOKEN" with your actual Discord bot token from the Developer Portal.
 
 4. Run the bot:
-bash
-Copy
-Edit
+
 start.bat
 🧠 Technical Notes
 Uses discord.ui.View for persistent buttons
