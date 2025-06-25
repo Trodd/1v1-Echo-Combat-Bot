@@ -6,32 +6,41 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 
 ## 🔧 Features
 
-- ✅ Slash command to start 1v1 draft signups with a timestamp and interactive signup buttons  
-- ✅ Players can sign up and remove themselves easily with buttons  
-- 🎮 Automatically creates **round-robin** matchups between all signed-up players  
-- 🧵 Generates **private match threads** only visible to the two players and the host  
-- 🗳️ Score reporting buttons for **Map 1, 2, and 3**  
-- ✅ Both players must confirm the results — confirmations reset if scores change  
-- 🧠 Score confirmation UI shows who has confirmed so far  
-- 🔁 Fully supports undo/reset:
-  - Reopens match in the same thread if possible  
-  - Deletes old score/results messages and result embeds  
-  - Automatically **reverts player stats** if the match was finalized  
-- 🏆 Leaderboard with **Wins / Losses / Games Played**, updated live after each match  
-- 🔒 Button to **close and delete threads** once finished  
-- 📤 Finalized match results are posted to a **public results channel** as embeds  
-- ♻️ **Rehydrates all active matches and signups** after a bot restart — including their buttons and state  
-- 📌 Handles **thread cap limits** by auto-creating overflow channels  
-- 🛡️ Commands are **role-gated** to ensure only authorized users can run `/1v1` and `/undo`  
+- ✅ Slash command to start 1v1 draft signups with a timestamp and optional notes  
+- ✅ Players can sign up or unsign with interactive buttons  
+- 🎮 Automatically creates **round-robin matchups** between all signed-up players  
+- 🧵 Generates **private match threads** visible only to the two players and admin  
+- 🗳️ Map score buttons for Map 1, Map 2, Map 3  
+- ✅ Match confirmation — both players must confirm  
+- 🔁 Confirmations reset if scores are changed to prevent tampering  
+- 🧠 Confirmation view shows which players have confirmed so far  
+- 🏳️ Forfeit button allows players to concede matches  
+- 🛑 Admins can forfeit on behalf of players  
+- 🔁 `/undo` reopens a match in the same thread (if it exists), reverts stats, and deletes old result messages  
+- 🏆 Live leaderboard auto-updates with wins/losses/games played  
+- 🔒 Close button to archive/delete match threads after finalization  
+- 📤 Public embed of finalized results to a results channel  
+- ♻️ Auto-rehydrates signups and matches after bot restart  
+- 📌 Auto-manages thread caps by creating overflow channels  
+- 🧑‍⚖️ All critical commands are **role-gated** using `REQUIRED_ROLE_ID`  
 
 ---
 
 ## 💬 Slash Commands
 
-| Command   | Description                                |
-|-----------|--------------------------------------------|
-| `/1v1`    | Starts a draft using a UNIX timestamp      |
-| `/undo`   | Reopens or resets a match between players  |
+| Command                 | Description                                              |
+|-------------------------|----------------------------------------------------------|
+| `/1v1`                  | Starts a 1v1 draft with a time and optional note         |
+| `/undo`                 | Resets or reopens a match between two players            |
+| `/create_matchups`      | Admin-only: Generates threads for the latest signup      |
+| `/clear_signup`         | Admin-only: Deletes latest signup embed and data         |
+| `/kick_tourney_player`  | Admin-only: Kicks a user from signup and deletes matches |
+| `/ban_tourney_player`   | Admin-only: Bans user from future signups                |
+| `/unban_tourney_player` | Admin-only: Removes player from ban list                 |
+| `/forfeit_match`        | Admin-only: Forces a forfeit win for a player            |
+| `/edit_signup_time`     | Admin-only: Updates the start time of the latest signup  |
+| `/edit_signup_note`     | Admin-only: Updates the note section of latest signup    |
+| `/end_tournament`       | Admin-only: Archives and deletes all active match threads|
 
 ---
 
@@ -39,7 +48,7 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 
 - Python 3.9 or higher  
 - `discord.py` ≥ 2.3.2  
-- A registered bot on [Discord Developer Portal](https://discord.com/developers/applications)
+- A registered bot via the [Discord Developer Portal](https://discord.com/developers/applications)
 
 ---
 
@@ -50,7 +59,6 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 ```bash
 git clone https://github.com/Trodd/1v1-draft-bot.git
 cd 1v1-draft-bot
-```
 
 ### 2. Install dependencies:
 
