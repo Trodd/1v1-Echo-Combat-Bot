@@ -118,13 +118,16 @@ class MatchView(discord.ui.View):
         p2_count = list(scores.values()).count(f"<@{self.p2.id}>")
         winner = self.p1 if p1_count > p2_count else self.p2
         loser = self.p2 if winner == self.p1 else self.p1
-        ensure_stat(winner.id)
-        ensure_stat(loser.id)
-        player_stats[str(winner.id)]["wins"] += 1
-        player_stats[str(winner.id)]["games"] += 1
-        player_stats[str(loser.id)]["losses"] += 1
-        player_stats[str(loser.id)]["games"] += 1
-        save_stats()
+
+        if not match_results[self.thread_id].get("forfeit"):
+            ensure_stat(winner.id)
+            ensure_stat(loser.id)
+            player_stats[str(winner.id)]["wins"] += 1
+            player_stats[str(winner.id)]["games"] += 1
+            player_stats[str(loser.id)]["losses"] += 1
+            player_stats[str(loser.id)]["games"] += 1
+            save_stats()
+
         return winner, loser, p1_count, p2_count
 
     async def update_score_message(self, thread):
@@ -227,6 +230,50 @@ class MatchView(discord.ui.View):
                 await interaction.response.defer()
         else:
             await interaction.response.send_message("Waiting for both confirmations.", ephemeral=True)
+    
+    @discord.ui.button(label="🏳️ Forfeit", style=discord.ButtonStyle.danger, custom_id="match_forfeit")
+    async def forfeit(self, interaction: discord.Interaction, button):
+        if interaction.user.id not in [self.p1.id, self.p2.id]:
+            return await interaction.response.send_message("You're not part of this match.", ephemeral=True)
+
+        forfeiter = interaction.user
+        winner = self.p2 if forfeiter.id == self.p1.id else self.p1
+
+        match_results[self.thread_id]["scores"] = {
+            1: f"<@{winner.id}>",
+            2: f"<@{winner.id}>"
+        }
+        match_results[self.thread_id]["confirmed"] = {self.p1.id, self.p2.id}
+
+        await self.update_score_message(interaction.channel)
+
+        result_msg = await interaction.channel.send(f"🏳️ <@{forfeiter.id}> forfeited. <@{winner.id}> wins by default.")
+        match_results[self.thread_id]["result_msg"] = result_msg.id
+
+        # Finalize flow
+        match_results[self.thread_id]["forfeit"] = True
+        winner, loser, w_score, l_score = self.apply_result()
+        results_channel = bot.get_channel(RESULTS_CHANNEL_ID)
+        if results_channel:
+            embed = discord.Embed(
+                title="📊 Match Result (Forfeit)",
+                color=discord.Color.red()
+            )
+            embed.add_field(name="Players", value=f"<@{self.p1.id}> vs <@{self.p2.id}>", inline=False)
+            embed.add_field(name="Winner", value=f"🏆 <@{winner.id}>", inline=True)
+            embed.add_field(name="Result", value=f"Won by forfeit", inline=True)
+            embed.set_footer(text="Best of 3 — Submitted via match thread")
+            results_embed_msg = await results_channel.send(embed=embed)
+            match_results[self.thread_id]["results_embed_msg"] = results_embed_msg.id
+
+        close_view = CloseThreadView(self.p1.id, self.p2.id, self.admin_id)
+        msg = await interaction.message.edit(view=close_view)
+        match_results[self.thread_id]["close_msg"] = msg.id
+        bot.add_view(close_view, message_id=msg.id)
+        match_results[self.thread_id]["finalized"] = True
+        save_rehydrate()
+
+        await interaction.response.send_message("Match forfeited and recorded.", ephemeral=True)
 
 class CloseThreadView(discord.ui.View):
     def __init__(self, p1_id, p2_id, admin_id):
@@ -262,6 +309,7 @@ class SignupView(discord.ui.View):
         self.players = []
         self.admin_id = admin_id
         self.event_time = event_time
+        self.notes = ""
         self.embed_msg = None
 
     def save_signup(self):
@@ -273,7 +321,9 @@ class SignupView(discord.ui.View):
             "channel_id": self.embed_msg.channel.id,
             "admin_id": self.admin_id,
             "event_time": self.event_time.isoformat(),
-            "players": [p.id for p in self.players]
+            "players": [p.id for p in self.players],
+            "notes": self.notes,
+            "notes": getattr(self, "notes", "")
         }
 
         all_signups = []
@@ -298,16 +348,30 @@ class SignupView(discord.ui.View):
 
     async def update_embed(self):
         embed = discord.Embed(
-            title="🎯 1v1 Draft Signups",
+            title="🎯 1v1 Echo Combat Signups",
             description=f"🕒 Starts: <t:{int(self.event_time.timestamp())}:F>\n\n"
                         "**Players Signed Up:**\n" +
                         ("\n".join(f"• <@{p.id}>" for p in self.players) or "*No players yet*"),
             color=discord.Color.green()
         )
+
+        # ✅ Add notes if available
+        if getattr(self, "notes", "").strip():
+            embed.add_field(name="📝 Notes", value=self.notes.strip(), inline=False)
+
         await self.embed_msg.edit(embed=embed, view=self)
 
     @discord.ui.button(label="✅ Sign Up", style=discord.ButtonStyle.green, custom_id="signup")
     async def signup(self, interaction: discord.Interaction, button):
+        try:
+            with open("banned_players.json", "r") as f:
+                banned = json.load(f)
+        except:
+            banned = []
+
+        if interaction.user.id in banned:
+            return await interaction.response.send_message("🚫 You are banned from this tournament.", ephemeral=True)
+
         if interaction.user in self.players:
             return await interaction.response.send_message("You're already signed up.", ephemeral=True)
         self.players.append(interaction.user)
@@ -324,80 +388,14 @@ class SignupView(discord.ui.View):
         self.save_signup()
         await interaction.response.send_message("You have been removed from signups.", ephemeral=True)
 
-    @discord.ui.button(label="🎮 Create Matchups", style=discord.ButtonStyle.blurple, custom_id="create_match")
-    async def create_matchups(self, interaction: discord.Interaction, button):
-        if interaction.user.id != self.admin_id:
-            return await interaction.response.send_message("Only the host can create matches.", ephemeral=True)
-        if len(self.players) < 2:
-            return await interaction.response.send_message("Not enough players.", ephemeral=True)
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        combos = list(itertools.combinations(self.players, 2))
-
-        for p1, p2 in combos:
-            parent_channel = interaction.channel
-            guild = interaction.guild
-
-            # Check if the thread limit is reached (max 50 active private threads per channel)
-            all_threads = await interaction.guild.active_threads()
-            active_threads = [t for t in all_threads if t.parent_id == parent_channel.id]
-
-            if len(active_threads) >= 50:
-
-                # Try to find or create a new temp-overflow-X channel
-                i = 1
-                while True:
-                    temp_name = f"Combat-1v1-overflow-{i}"
-                    existing = discord.utils.get(guild.text_channels, name=temp_name)
-                    if existing is None:
-                        break
-                    i += 1
-
-                parent_channel = await guild.create_text_channel(
-                    name=temp_name,
-                    overwrites={
-                        guild.default_role: discord.PermissionOverwrite(send_messages=False, view_channel=True),
-                        guild.me: discord.PermissionOverwrite(send_messages=True, manage_channels=True)
-                    },
-                    reason="Auto-created fallback channel due to thread cap"
-                )
-                print(f"⚠️ Created temp overflow channel: {temp_name}")
-
-            # ✅ Create the thread in the correct channel (original or fallback)
-            thread = await parent_channel.create_thread(
-                name=f"{p1.name}_vs_{p2.name}",
-                type=discord.ChannelType.private_thread,
-                invitable=False
-            )
-
-            await thread.add_user(p1)
-            await thread.add_user(p2)
-            await thread.add_user(interaction.user)
-
-            match_results[thread.id] = {
-                "scores": {},
-                "confirmed": set(),
-                "admin_id": interaction.user.id,
-                "players": [p1.id, p2.id]
-            }
-            key = tuple(sorted([p1.id, p2.id]))
-            match_lookup[key] = thread.id
-
-            view = MatchView(p1, p2, interaction.user.id, thread.id)
-            msg = await thread.send(
-                f"**Match:** <@{p1.id}> vs <@{p2.id}>\nUse the buttons below to report map results.",
-                view=view
-            )
-            view.score_msg = msg
-            match_results[thread.id]["score_msg"] = msg.id
-            bot.add_view(view, message_id=msg.id)
-            save_rehydrate()
-
-        await interaction.followup.send("✅ Round robin matches created.", ephemeral=True)
 # === Commands ===
 @bot.tree.command(name="1v1", description="Start a 1v1 draft")
-@app_commands.describe(start_time="Match start time as UNIX timestamp")
-async def start_draft(interaction: discord.Interaction, start_time: str):
+@app_commands.describe(
+    start_time="Match start time as UNIX timestamp (e.g., <t:TIMESTAMP:F>)",
+    note="Optional notes to include in the signup embed"
+)
+async def start_draft(interaction: discord.Interaction, start_time: str, note: str = ""):
+
     role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
 
     if role is None:
@@ -421,6 +419,7 @@ async def start_draft(interaction: discord.Interaction, start_time: str):
         return await interaction.response.send_message("Invalid timestamp format.", ephemeral=True)
 
     view = SignupView(admin_id=interaction.user.id, event_time=event_time)
+    view.notes = note.strip()
     embed = discord.Embed(
         title="🎯 1v1 Draft Signups",
         description=f"🕒 Starts: <t:{int(event_time.timestamp())}:F>\n\n**Players Signed Up:**\n*No players yet*",
@@ -428,6 +427,7 @@ async def start_draft(interaction: discord.Interaction, start_time: str):
     )
     msg = await interaction.channel.send(embed=embed, view=view)
     view.embed_msg = msg
+    await view.update_embed()
     view.save_signup()
     bot.add_view(view, message_id=msg.id)
 
@@ -477,6 +477,88 @@ async def update_leaderboard_message():
         with open(msg_id_file, "w") as f:
             f.write(str(message.id))
 
+@bot.tree.command(name="create_matchups", description="Create 1v1 match threads from the latest signup")
+async def create_matchups(interaction: discord.Interaction):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You must have the `{role.name}` role to use this command.",
+            ephemeral=True
+        )
+
+    # Load signups.json
+    try:
+        with open("signups.json", "r") as f:
+            all_signups = json.load(f)
+    except Exception as e:
+        return await interaction.response.send_message(f"❌ Failed to load signups.json: {e}", ephemeral=True)
+
+    if not all_signups:
+        return await interaction.response.send_message("⚠️ No signups found.", ephemeral=True)
+
+    # Get the most recent one (last in the list)
+    signup_data = all_signups[-1]
+    players = [await bot.fetch_user(uid) for uid in signup_data["players"]]
+    if len(players) < 2:
+        return await interaction.response.send_message("❌ Not enough players to create matchups.", ephemeral=True)
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    combos = list(itertools.combinations(players, 2))
+    parent_channel = interaction.channel
+    guild = interaction.guild
+
+    for p1, p2 in combos:
+        all_threads = await guild.active_threads()
+        active_threads = [t for t in all_threads if t.parent_id == parent_channel.id]
+
+        if len(active_threads) >= 50:
+            i = 1
+            while True:
+                temp_name = f"combat-1v1-overflow-{i}"
+                existing = discord.utils.get(guild.text_channels, name=temp_name)
+                if not existing:
+                    break
+                i += 1
+
+            parent_channel = await guild.create_text_channel(
+                name=temp_name,
+                overwrites={
+                    guild.default_role: discord.PermissionOverwrite(send_messages=False, view_channel=True),
+                    guild.me: discord.PermissionOverwrite(send_messages=True, manage_channels=True)
+                },
+                reason="Auto-created fallback channel due to thread cap"
+            )
+
+        thread = await parent_channel.create_thread(
+            name=f"{p1.name}_vs_{p2.name}",
+            type=discord.ChannelType.private_thread,
+            invitable=False
+        )
+
+        await thread.add_user(p1)
+        await thread.add_user(p2)
+        await thread.add_user(interaction.user)
+
+        match_results[thread.id] = {
+            "scores": {},
+            "confirmed": set(),
+            "admin_id": interaction.user.id,
+            "players": [p1.id, p2.id]
+        }
+        match_lookup[tuple(sorted([p1.id, p2.id]))] = thread.id
+
+        view = MatchView(p1, p2, interaction.user.id, thread.id)
+        msg = await thread.send(
+            f"**Match:** <@{p1.id}> vs <@{p2.id}>\nUse the buttons below to report map results.",
+            view=view
+        )
+        view.score_msg = msg
+        match_results[thread.id]["score_msg"] = msg.id
+        bot.add_view(view, message_id=msg.id)
+        save_rehydrate()
+
+    await interaction.followup.send("✅ Round robin matches created from latest signup.", ephemeral=True)
 
 @bot.tree.command(name="undo", description="Undo a match by player pair")
 @app_commands.describe(user1="First player", user2="Second player")
@@ -668,6 +750,378 @@ async def undo(interaction: discord.Interaction, user1: discord.User, user2: dis
 
     await interaction.response.send_message("✅ Match recreated and players notified.", ephemeral=True)
 
+@bot.tree.command(name="next_draft_time", description="Edit the start time of the latest draft signup")
+@app_commands.describe(new_time="New start time (UNIX timestamp or <t:...> format)")
+async def next_draft_time(interaction: discord.Interaction, new_time: str):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You must have the `{role.name}` role to use this command.",
+            ephemeral=True
+        )
+
+    signups = safe_load_json("signups.json") or []
+    if not signups:
+        return await interaction.response.send_message("📭 No signup drafts to update.", ephemeral=True)
+
+    # Parse new time
+    try:
+        match = re.search(r"<t:(\d+):[a-zA-Z]?>", new_time)
+        timestamp = int(match.group(1)) if match else int(new_time)
+        event_time = datetime.fromtimestamp(timestamp, timezone.utc)
+    except:
+        return await interaction.response.send_message("❌ Invalid time format.", ephemeral=True)
+
+    # Find the most recent signup (last in file)
+    data = signups[-1]
+    data["event_time"] = event_time.isoformat()
+
+    # Update the message
+    channel = bot.get_channel(data["channel_id"])
+    if not channel:
+        return await interaction.response.send_message("⚠️ Could not find signup channel.", ephemeral=True)
+
+    try:
+        msg = await channel.fetch_message(data["message_id"])
+    except discord.NotFound:
+        return await interaction.response.send_message("⚠️ Signup message not found.", ephemeral=True)
+
+    # Update JSON
+    with open("signups.json", "w") as f:
+        json.dump(signups, f)
+
+    # Refresh the embed
+    view = SignupView(data["admin_id"], event_time)
+    view.notes = data.get("notes", "")
+    view.players = [await bot.fetch_user(uid) for uid in data["players"]]
+    view.embed_msg = msg
+    await view.update_embed()
+    bot.add_view(view, message_id=msg.id)
+
+    return await interaction.response.send_message(
+        f"✅ Draft time updated to <t:{int(event_time.timestamp())}:F>", ephemeral=True
+    )
+
+@bot.tree.command(name="edit_notes", description="Edit the notes on the latest 1v1 signup draft")
+@app_commands.describe(notes="The new notes to display under the signup")
+async def edit_notes(interaction: discord.Interaction, notes: str):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You must have the `{role.name}` role to use this command.",
+            ephemeral=True
+        )
+
+    signups = safe_load_json("signups.json") or []
+    if not signups:
+        return await interaction.response.send_message("📭 No signup drafts to update.", ephemeral=True)
+
+    # Find the most recent signup
+    data = signups[-1]
+    data["notes"] = notes
+
+    # Locate the message
+    channel = bot.get_channel(data["channel_id"])
+    if not channel:
+        return await interaction.response.send_message("⚠️ Could not find signup channel.", ephemeral=True)
+
+    try:
+        msg = await channel.fetch_message(data["message_id"])
+    except discord.NotFound:
+        return await interaction.response.send_message("⚠️ Signup message not found.", ephemeral=True)
+
+    # Update JSON
+    with open("signups.json", "w") as f:
+        json.dump(signups, f)
+
+    # Rebuild view and embed
+    view = SignupView(data["admin_id"], datetime.fromisoformat(data["event_time"]))
+    view.notes = notes
+    view.players = [await bot.fetch_user(uid) for uid in data["players"]]
+    view.embed_msg = msg
+    await view.update_embed()
+    bot.add_view(view, message_id=msg.id)
+
+    return await interaction.response.send_message("✅ Notes updated successfully.", ephemeral=True)
+
+@bot.tree.command(name="forfeit_match", description="Force a forfeit result for a 1v1 match")
+@app_commands.describe(
+    forfeiter="The player who is forfeiting",
+    opponent="The player who is receiving the win"
+)
+async def forfeit_match(interaction: discord.Interaction, forfeiter: discord.User, opponent: discord.User):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You must have the `{role.name}` role to use this command.",
+            ephemeral=True
+        )
+
+    key = tuple(sorted([forfeiter.id, opponent.id]))
+    thread_id = match_lookup.get(key)
+
+    if not thread_id:
+        return await interaction.response.send_message("❌ No existing match found between these players.", ephemeral=True)
+
+    try:
+        thread = await interaction.guild.fetch_channel(thread_id)
+    except discord.NotFound:
+        return await interaction.response.send_message("❌ Could not fetch the match thread.", ephemeral=True)
+
+    # Record match as forfeit win for opponent
+    match_results[thread_id] = {
+        "scores": {
+            1: f"<@{opponent.id}>",
+            2: f"<@{opponent.id}>"
+        },
+        "confirmed": {forfeiter.id, opponent.id},
+        "admin_id": interaction.user.id,
+        "players": [forfeiter.id, opponent.id],
+        "finalized": True
+    }
+
+    result_msg = await thread.send(f"🏳️ <@{forfeiter.id}> has forfeited. <@{opponent.id}> wins by default.")
+    match_results[thread_id]["result_msg"] = result_msg.id
+
+    # Update stats
+    winner, loser, w_score, l_score = (opponent, forfeiter, 2, 0)
+    ensure_stat(winner.id)
+    ensure_stat(loser.id)
+    player_stats[str(winner.id)]["wins"] += 1
+    player_stats[str(winner.id)]["games"] += 1
+    player_stats[str(loser.id)]["losses"] += 1
+    player_stats[str(loser.id)]["games"] += 1
+    save_stats()
+
+    # Post to results channel
+    results_channel = bot.get_channel(RESULTS_CHANNEL_ID)
+    if results_channel:
+        embed = discord.Embed(
+            title="📊 Match Result (Admin Forfeit)",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Players", value=f"<@{forfeiter.id}> vs <@{opponent.id}>", inline=False)
+        embed.add_field(name="Winner", value=f"🏆 <@{opponent.id}>", inline=True)
+        embed.add_field(name="Result", value="Forfeit by admin", inline=True)
+        embed.set_footer(text="Best of 3 — Submitted by admin override")
+        results_embed_msg = await results_channel.send(embed=embed)
+        match_results[thread_id]["results_embed_msg"] = results_embed_msg.id
+
+    save_rehydrate()
+
+    # Archive and delete thread
+    try:
+        await thread.edit(archived=True, locked=True)
+        await asyncio.sleep(5)
+        await thread.delete()
+    except Exception as e:
+        print(f"⚠️ Error closing thread after forfeit: {e}")
+
+    await interaction.response.send_message("✅ Forfeit recorded and thread closed.", ephemeral=True)
+
+@bot.tree.command(name="end_tournament", description="End the tournament early and clean up all threads")
+async def end_tournament(interaction: discord.Interaction):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You must have the `{role.name}` role to use this command.",
+            ephemeral=True
+        )
+
+    await interaction.response.send_message("⚠️ Ending tournament — cleaning up threads...", ephemeral=True)
+
+    cleaned_threads = 0
+    cleaned_channels = 0
+
+    # Step 1: Archive and delete all match threads
+    for thread_id in list(match_results.keys()):
+        try:
+            thread = await interaction.guild.fetch_channel(thread_id)
+            if isinstance(thread, discord.Thread):
+                await thread.edit(archived=True, locked=True)
+                await asyncio.sleep(2)
+                await thread.delete()
+                cleaned_threads += 1
+        except Exception as e:
+            print(f"⚠️ Failed to delete thread {thread_id}: {e}")
+
+    # Step 2: Optionally delete temp overflow text channels
+    for channel in interaction.guild.text_channels:
+        if channel.name.startswith("combat-1v1-overflow"):
+            try:
+                await channel.delete(reason="Tournament ended")
+                cleaned_channels += 1
+            except Exception as e:
+                print(f"⚠️ Could not delete overflow channel {channel.name}: {e}")
+
+    await interaction.followup.send(
+        f"✅ Tournament ended early.\n🧵 Threads deleted: `{cleaned_threads}`\n🗑️ Temp channels deleted: `{cleaned_channels}`",
+        ephemeral=True
+    )
+
+@bot.tree.command(name="clear_signup", description="Remove the latest active signup embed and data")
+async def clear_signup(interaction: discord.Interaction):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You must have the `{role.name}` role to use this command.",
+            ephemeral=True
+        )
+
+    if not os.path.exists("signups.json"):
+        return await interaction.response.send_message("❌ No signups.json file found.", ephemeral=True)
+
+    try:
+        with open("signups.json", "r") as f:
+            all_signups = json.load(f)
+    except Exception as e:
+        return await interaction.response.send_message(f"❌ Could not read signups.json: {e}", ephemeral=True)
+
+    if not all_signups:
+        return await interaction.response.send_message("⚠️ No active signups to clear.", ephemeral=True)
+
+    latest = all_signups[-1]
+
+    # Attempt to delete the signup embed message
+    try:
+        channel = bot.get_channel(latest["channel_id"])
+        if channel:
+            msg = await channel.fetch_message(latest["message_id"])
+            await msg.delete()
+    except Exception as e:
+        print(f"⚠️ Failed to delete signup message: {e}")
+    
+    import shutil
+
+    # Backup before removal
+    shutil.copy("signups.json", "signups_backup.json")
+
+    # Remove from list and save
+    all_signups.pop()
+    with open("signups.json", "w") as f:
+        json.dump(all_signups, f)
+
+    await interaction.response.send_message("✅ Latest signup has been cleared.", ephemeral=True)
+
+@bot.tree.command(name="kick_tourney_player", description="Kick a player from the tournament")
+@app_commands.describe(user="Player to remove from signup and match threads")
+async def kick_tourney_player(interaction: discord.Interaction, user: discord.User):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message("⛔ You don't have permission to use this command.", ephemeral=True)
+
+    # 1. Remove from latest signup
+    try:
+        with open("signups.json", "r") as f:
+            signups = json.load(f)
+    except Exception:
+        signups = []
+
+    if not signups:
+        return await interaction.response.send_message("⚠️ No active signups found.", ephemeral=True)
+
+    latest = signups[-1]
+    if user.id in latest["players"]:
+        latest["players"].remove(user.id)
+        # ✅ Preserve existing notes when re-saving
+        for s in signups:
+            if s["message_id"] == latest["message_id"]:
+                s["players"] = latest["players"]
+                break
+
+        with open("signups.json", "w") as f:
+            json.dump(signups, f)
+
+        # Update signup message if possible
+        try:
+            ch = bot.get_channel(latest["channel_id"])
+            msg = await ch.fetch_message(latest["message_id"])
+            view = SignupView(latest["admin_id"], datetime.fromisoformat(latest["event_time"]))
+            view.players = [await bot.fetch_user(uid) for uid in latest["players"]]
+            view.embed_msg = msg
+            view.notes = latest.get("notes", "")
+            await view.update_embed()
+        except Exception as e:
+            print(f"⚠️ Could not update signup embed after kick: {e}")
+
+    # 2. Clean up all match threads involving user
+    to_remove = []
+    for thread_id, data in list(match_results.items()):
+        if user.id in data.get("players", []):
+            try:
+                thread = await bot.fetch_channel(int(thread_id))
+                await thread.send(f"🚫 Match cancelled due to player kick: <@{user.id}>")
+                await thread.edit(archived=True, locked=True)
+                await asyncio.sleep(2)
+                await thread.delete()
+            except Exception as e:
+                print(f"⚠️ Could not clean up thread {thread_id}: {e}")
+            to_remove.append(thread_id)
+
+    for tid in to_remove:
+        match_results.pop(tid, None)
+
+    # 3. Clean up from match_lookup
+    for k in list(match_lookup.keys()):
+        if user.id in k:
+            match_lookup.pop(k, None)
+
+    save_rehydrate()
+    await interaction.response.send_message(f"✅ {user.mention} has been kicked from the tournament.", ephemeral=True)
+
+@bot.tree.command(name="ban_tourney_player", description="Ban a player from participating in this tournament")
+@app_commands.describe(user="Player to block from signing up")
+async def ban_tourney_player(interaction: discord.Interaction, user: discord.User):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message("⛔ You don't have permission to use this command.", ephemeral=True)
+
+    # ✅ Auto-create file if missing
+    if not os.path.exists("banned_players.json"):
+        with open("banned_players.json", "w") as f:
+            json.dump([], f)
+
+    # Load ban list
+    with open("banned_players.json", "r") as f:
+        banned = json.load(f)
+
+    if user.id in banned:
+        return await interaction.response.send_message(f"{user.mention} is already banned.", ephemeral=True)
+
+    banned.append(user.id)
+    with open("banned_players.json", "w") as f:
+        json.dump(banned, f)
+
+    await interaction.response.send_message(f"✅ {user.mention} is now banned from the tournament.", ephemeral=True)
+
+@bot.tree.command(name="unban_tourney_player", description="Remove a player from the tournament ban list")
+@app_commands.describe(user="Player to unban")
+async def unban_tourney_player(interaction: discord.Interaction, user: discord.User):
+    role = discord.utils.get(interaction.guild.roles, id=REQUIRED_ROLE_ID)
+    if role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            f"⛔ You don't have permission to use this command.", ephemeral=True
+        )
+
+    # Load or create ban list
+    if not os.path.exists("banned_players.json"):
+        return await interaction.response.send_message("⚠️ No ban list found.", ephemeral=True)
+
+    try:
+        with open("banned_players.json", "r") as f:
+            banned = json.load(f)
+    except json.JSONDecodeError:
+        return await interaction.response.send_message("❌ Failed to read ban list (corrupted JSON).", ephemeral=True)
+
+    if user.id not in banned:
+        return await interaction.response.send_message(f"{user.mention} is not banned.", ephemeral=True)
+
+    banned.remove(user.id)
+    with open("banned_players.json", "w") as f:
+        json.dump(banned, f)
+
+    await interaction.response.send_message(f"✅ {user.mention} has been unbanned from the tournament.", ephemeral=True)
+
 @bot.event
 async def on_ready():
     load_stats()
@@ -697,6 +1151,7 @@ async def on_ready():
             except discord.NotFound:
                 continue
             view = SignupView(data["admin_id"], datetime.fromisoformat(data["event_time"]))
+            view.notes = data.get("notes", "")
             view.players = [await bot.fetch_user(uid) for uid in data["players"]]
             view.embed_msg = message
             await view.update_embed()
