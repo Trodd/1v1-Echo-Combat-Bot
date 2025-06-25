@@ -59,57 +59,45 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 ```bash
 git clone https://github.com/Trodd/1v1-draft-bot.git
 cd 1v1-draft-bot
+2. Install dependencies:
 
-### 2. Install dependencies:
-
-```bash
 pip install -r requirements.txt
-```
+3. Configure your bot
+In draft.py, set the following constants:
 
-### 3. Open `draft.py` and fill in the required configuration:
 
-#### ✅ Fill in these at the top:
+RESULTS_CHANNEL_ID = 1374266417364336641       # Results embed channel
+LEADERBOARD_CHANNEL_ID = 1374268467079024671   # Leaderboard channel
+REQUIRED_ROLE_ID = 1387186995146658013         # Role required to manage matches
+At the bottom of the file, add your bot token:
 
-```python
-# -----------FILL IN IDs HERE SO BOT CAN WORK------------------------
 
-RESULTS_CHANNEL_ID = 1374266417364336641       # Channel to post match results
-LEADERBOARD_CHANNEL_ID = 1374268467079024671   # Channel to post the leaderboard
-REQUIRED_ROLE_ID = 1387186995146658013         # Role required to use /1v1 and /undo
-
-#--------------------------------------------------------------------
-```
-
-#### 🔐 Then scroll to the bottom and insert your bot token:
-
-```python
 bot.run("YOUR_BOT_TOKEN")
-```
+Replace "YOUR_BOT_TOKEN" with your actual bot token from Discord’s Developer Portal.
 
-Replace `"YOUR_BOT_TOKEN"` with your actual Discord bot token from the Developer Portal.
+4. Run the bot
+Run the bot using the Windows batch file:
 
----
 
-### 4. Run the bot:
-
-```bash
 start.bat
-```
+Or directly via Python:
 
----
 
-## 🧠 Technical Notes
+python draft.py
+🧠 Technical Notes
+player_stats.json — stores leaderboard stats
 
-- Uses `discord.ui.View` for persistent buttons  
-- Match state, score confirmations, and signups are rehydrated from disk on bot restart  
-- `player_stats.json` stores win/loss/game counts  
-- `rehydrate.json` stores active match state  
-- `signups.json` stores active signup sessions  
+rehydrate.json — stores all active match thread data (including buttons/views)
 
----
+signups.json — stores current and past signup sessions
 
-## 📝 License
+banned_players.json — keeps track of players blocked from signing up
 
+Persistent discord.ui.Views are automatically reattached on restart
+
+Uses thread-safe design for ephemeral and permanent data
+
+📝 License
 MIT License — free to use, modify, and distribute.
 
 
