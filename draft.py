@@ -7,6 +7,7 @@ import json
 import os
 import asyncio
 import re
+import random
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -1122,6 +1123,103 @@ async def unban_tourney_player(interaction: discord.Interaction, user: discord.U
 
     await interaction.response.send_message(f"✅ {user.mention} has been unbanned from the tournament.", ephemeral=True)
 
+@bot.tree.command(name="start_teams", description="Balance and assign players into teams based on win ratio")
+@app_commands.describe(team_size="Number of players per team (e.g. 2 or 3)")
+async def start_teams(interaction: discord.Interaction, team_size: int):
+    if REQUIRED_ROLE_ID not in [role.id for role in interaction.user.roles]:
+        return await interaction.response.send_message("⛔ You don’t have permission to use this command.", ephemeral=True)
+    if team_size < 1:
+        return await interaction.response.send_message("❌ Team size must be at least 1.", ephemeral=True)
+
+    try:
+        with open("signups.json", "r") as f:
+            signups = json.load(f)
+    except:
+        return await interaction.response.send_message("⚠️ No signup data found.", ephemeral=True)
+
+    if not signups:
+        return await interaction.response.send_message("❌ No active signups.", ephemeral=True)
+
+    latest = signups[-1]
+    player_ids = latest["players"]
+    players = [await bot.fetch_user(uid) for uid in player_ids]
+
+    if len(players) < team_size * 2:
+        return await interaction.response.send_message(f"❌ Not enough players to form at least 2 full teams of {team_size}.", ephemeral=True)
+
+    num_teams = len(players) // team_size
+
+    # === Load and calculate win ratios ===
+    try:
+        with open("player_stats.json", "r") as f:
+            stats = json.load(f)
+    except:
+        stats = {}
+
+    def win_ratio(player):
+        uid = str(player.id)
+        data = stats.get(uid, {})
+        games = data.get("games", 0)
+        wins = data.get("wins", 0)
+        return wins / games if games > 0 else 0.5
+
+    players.sort(key=win_ratio, reverse=True)  # High to low
+
+    # === Snake draft assignment ===
+    teams = [[] for _ in range(num_teams)]
+    direction = 1
+    index = 0
+
+    for p in players:
+        teams[index].append(p)
+        if direction == 1:
+            if index < num_teams - 1:
+                index += 1
+            else:
+                direction = -1
+        else:
+            if index > 0:
+                index -= 1
+            else:
+                direction = 1
+
+    team_names = [f"Team {i+1}" for i in range(len(teams))]
+    await interaction.channel.send(f"🎯 Formed **{len(teams)} balanced teams** of {team_size} players (by win ratio).")
+
+    # Show teams
+    for name, team in zip(team_names, teams):
+        mentions = " • ".join(f"<@{p.id}>" for p in team)
+        await interaction.channel.send(f"**{name}**: {mentions}")
+
+    # Matchups
+    for (team_a, name_a), (team_b, name_b) in itertools.combinations(zip(teams, team_names), 2):
+        thread = await interaction.channel.create_thread(
+            name=f"{name_a}_vs_{name_b}",
+            type=discord.ChannelType.private_thread,
+            invitable=False
+        )
+        for member in team_a + team_b:
+            await thread.add_user(member)
+        await thread.add_user(interaction.user)
+
+        match_results[thread.id] = {
+            "scores": {},
+            "confirmed": set(),
+            "admin_id": interaction.user.id,
+            "players": [p.id for p in team_a + team_b]
+        }
+
+        view = MatchView(team_a[0], team_b[0], interaction.user.id, thread.id)
+
+        await thread.send(
+            f"**Match:** {name_a} vs {name_b}\n"
+            f"{' + '.join(f'<@{p.id}>' for p in team_a)} vs {' + '.join(f'<@{p.id}>' for p in team_b)}\n"
+            f"Use the buttons below to report map results. Only the Winner for each map should press the button. Both teams must confirm.",
+            view=view
+        )
+
+    await interaction.response.send_message("✅ Balanced teams and matchups created.", ephemeral=True)
+
 @bot.event
 async def on_ready():
     load_stats()
@@ -1204,7 +1302,6 @@ async def on_ready():
             print(f"❌ Failed to rehydrate thread {thread_id_str}: {e}")
 
     print(f"✅ Logged in as {bot.user}")
-
 
 bot.run("BOT_TOKEN_HERE")
 
