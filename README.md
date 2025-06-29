@@ -28,19 +28,20 @@ A powerful Discord bot for managing 1v1 **round-robin tournaments**, complete wi
 
 ## 💬 Slash Commands
 
-| Command                 | Description                                              |
-|-------------------------|----------------------------------------------------------|
-| `/1v1`                  | Starts a 1v1 draft with a time and optional note         |
-| `/undo`                 | Resets or reopens a match between two players            |
-| `/create_matchups`      | Admin-only: Generates threads for the latest signup      |
-| `/clear_signup`         | Admin-only: Deletes latest signup embed and data         |
-| `/kick_tourney_player`  | Admin-only: Kicks a user from signup and deletes matches |
-| `/ban_tourney_player`   | Admin-only: Bans user from future signups                |
-| `/unban_tourney_player` | Admin-only: Removes player from ban list                 |
-| `/forfeit_match`        | Admin-only: Forces a forfeit win for a player            |
-| `/edit_signup_time`     | Admin-only: Updates the start time of the latest signup  |
-| `/edit_signup_note`     | Admin-only: Updates the note section of latest signup    |
-| `/end_tournament`       | Admin-only: Archives and deletes all active match threads|
+| Command                 | Description                                                 |
+|-------------------------|-------------------------------------------------------------|
+| `/1v1`                  | Starts a 1v1 draft with a time and optional note            |
+| `/undo`                 | Resets or reopens a match between two players               |
+| `/create_matchups`      | Admin-only: Generates threads for the latest signup         |
+| `/clear_signup`         | Admin-only: Deletes latest signup embed and data            |
+| `/kick_tourney_player`  | Admin-only: Kicks a user from signup and deletes matches    |
+| `/ban_tourney_player`   | Admin-only: Bans user from future signups                   |
+| `/unban_tourney_player` | Admin-only: Removes player from ban list                    |
+| `/forfeit_match`        | Admin-only: Forces a forfeit win for a player               |
+| `/edit_signup_time`     | Admin-only: Updates the start time of the latest signup     |
+| `/edit_signup_note`     | Admin-only: Updates the note section of latest signup       |
+| `/end_tournament`       | Admin-only: Archives and deletes all active match threads   |
+| `/start_Team`           | Admin-only:Start a optional random team assign with matchups|
 
 ---
 
